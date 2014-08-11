@@ -51,37 +51,37 @@
 \end{slide}
 
 
-
-
-
 \begin{slide}
 
     \textcolor{blue}{\Large{Scaling Django}}
 
     \begin{itemize}
-        \item What 'comes apart' first?
-        \item What should you do with your code, caching, and database?
+        \item What can you do with your code, caching, and database?
     \end{itemize}
+
+    \begin{center}
+        \includegraphics[height=10cm]{pony-magic}
+    \end{center}
 
 \end{slide}
 
 
-
-
 \begin{slide}
 
-    \textcolor{blue}{\Large{Code: base classes}}
+    \textcolor{blue}{\Large{Wrap Django's classes}}
 
     \begin{itemize}
-        \item Wrap around django where sensible, to  implement scaling changes at the highest level
-        \item Views, admin, models, querysets, ...
+        \item Wrap around django where sensible, to implement scalability changes at the highest level.
+        \item Views, admin, models, querysets, fields, ...
     \end{itemize}
 
-    \begin{lstlisting}[language=Python]
+    \begin{lstlisting}
 # project/admin.py
 class ModelAdmin(admin.ModelAdmin):
     pass
+    \end{lstlisting}
 
+    \begin{lstlisting}
 # blog/admin.py
 from project.admin import ModelAdmin
 
@@ -94,25 +94,209 @@ class BlogPostAdmin(ModelAdmin):
 
 \begin{slide}
 
-    \textcolor{blue}{\Large{Code: base classes}}
-
     \begin{itemize}
-        \item e.g. to make all Admin pages use new queryset class (see my \href{http://adamj.eu/tech/2014/07/16/extending-djangos-queryset-to-return-approximate-counts/}{blog post})
+        \item e.g. to make all Admin pages use new queryset class (see my \href{http://adamj.eu/tech/2014/07/16/extending-djangos-queryset-to-return-approximate-counts/}{blog post} on approximate counts)
     \end{itemize}
 
-
-    \begin{lstlisting}[language=Python]
+    \begin{lstlisting}
 # project/admin.py
 class ModelAdmin(admin.ModelAdmin):
     def queryset(self, request):
-        qs = super(MySuperDuperAdmin, self) \
-             .queryset(request)
+        qs = super(ModelAdmin, self).queryset(request)
         qs = qs._clone(klass=ApproxCountQuerySet)
         return qs
     \end{lstlisting}
 
 \end{slide}
 
+
+\begin{slide}
+
+    \textcolor{blue}{\Large{Caching}}
+
+    \begin{center}
+        \includegraphics[height=9cm]{squirrel-eating-nuts}
+    \end{center}
+
+    \begin{itemize}
+        \item Caches make things faster.
+        \item But don't be overzealous - keep your caching/invalidation model simple, and don't use it to sticky tape over more fundamental problems (slow DB, code execution time, ...).
+    \end{itemize}
+
+\end{slide}
+
+
+\begin{slide}
+
+    \begin{itemize}
+        \item Monitor all the things (New Relic):
+    \end{itemize}
+
+    \begin{center}
+        \includegraphics[height=12cm]{web-transactions-1}
+    \end{center}
+
+\end{slide}
+
+
+\begin{slide}
+
+    \begin{itemize}
+        \item At scale, percentile view is much more useful:
+    \end{itemize}
+
+    \begin{center}
+        \includegraphics[height=12cm]{web-transactions-2}
+    \end{center}
+
+\end{slide}
+
+
+\begin{slide}
+
+    \textcolor{blue}{\Large{Background fill your cache}}
+
+    \begin{itemize}
+        \item Typical cache code puts the refill in the request path:
+    \end{itemize}
+
+    \begin{lstlisting}
+def some_func(user_id):
+    cache_key = 'key:' + str(user_id)
+    val = cache.get(cache_key)
+    if val is None:
+        val = slow_func()
+        cache.set(cache_key, val)
+    return val
+    \end{lstlisting}
+
+    \begin{itemize}
+        \item For the 99th percentile power user, a reasonable but slightly slow function call could become way too slow ($>$100ms).
+    \end{itemize}
+
+\end{slide}
+
+
+\begin{slide}
+
+    \begin{itemize}
+        \item Instead, use an always-there cache value with a timestamp:
+    \end{itemize}
+
+    \begin{lstlisting}
+def some_func():
+    cache_key = 'key:' + str(user_id)
+    last_update, val cache.get(cache_key)
+    if last_update < now() - timedelta(minutes=15):
+        # celery task to refill cache_key
+        slow_func.apply_async([user_id])
+    return val
+    \end{lstlisting}
+
+    \begin{itemize}
+        \item In-request code path now just one cache fetch for even the 99th percentile user on a bad day.
+        \item (Code simplified - you want to put task in queue just once, and maybe use a persistent cache backend.)
+    \end{itemize}
+
+\end{slide}
+
+
+\begin{slide}
+
+    \textcolor{blue}{\Large{Database}}
+
+    \begin{itemize}
+        \item Don't be hasty to get away from the ORM or relational databases.
+        \item Instead, learn them better.
+        \item Understand how Querysets become SQL, how the DB will handle SQL, and find easy wins on this path.
+    \end{itemize}
+
+\end{slide}
+
+
+\begin{slide}
+
+    \textcolor{blue}{\Large{Use prefetch\_related}}
+
+    \begin{itemize}
+        \item \textbf{select\_related} on many models will generate a query with a lot of JOIN clauses.
+        \item \textbf{prefetch\_related} will generate many smaller simpler queries - one for each table.
+        \item It may be counterintuitive, but using \textbf{prefetch\_related} to do app-level JOINs can be faster and is much more scalable.
+        \item Django is really friendly here - it's so easy to switch `select' to `prefetch'!
+    \end{itemize}
+
+\end{slide}
+
+
+\begin{slide}
+
+    \textcolor{blue}{\Large{Learn the way of the index}}
+
+    \begin{itemize}
+        \item Indexing is an art that takes time to perfect. Some trial and error.
+        \item Number one problem in Django - bunging `index=True' on several fields and expecting all queries to magically speed up.
+    \end{itemize}
+
+    \begin{center}
+        \includegraphics[height=9cm]{buddhist-monk}
+    \end{center}
+
+\end{slide}
+
+
+\begin{slide}
+
+    \textcolor{blue}{\Large{Run a query killer/sniper}}
+
+    \begin{center}
+        \includegraphics[height=10cm]{Camouflaged-sniper}
+    \end{center}
+
+    \begin{itemize}
+        \item Web request timed out != query cancelled
+        \item Every 10 seconds, kill any query lasting longer than 30 seconds, and email you about it
+    \end{itemize}
+
+\end{slide}
+
+
+\begin{slide}
+
+    \textcolor{blue}{\Large{Use replicas smartly}}
+
+    \begin{center}
+        \includegraphics[height=12cm]{Marian_and_Vivian_Brown}
+    \end{center}
+
+    \begin{itemize}
+        \item Replicas are amazing, use them.
+    \end{itemize}
+
+\end{slide}
+
+
+\begin{slide}
+
+    \begin{itemize}
+        \item You can use a \textbf{DBRouter} in your Django settings to add logic for which DB is used.
+        \item Or, you can manually direct certain queries that you know can handle slightly stale data, e.g.:
+    \end{itemize}
+
+    \begin{lstlisting}
+# project/admin.py
+class ModelAdmin(admin.ModelAdmin):
+    def queryset(self, request):
+        qs = super(ModelAdmin, self).queryset(request)
+        if request.method == 'GET':
+            qs = qs.using('replica')
+        return qs
+    \end{lstlisting}
+
+    \begin{itemize}
+        \item Routing admin to replica is actually a really big win - stop the big nasty admin queries from affecting the performance of the main app.
+    \end{itemize}
+
+\end{slide}
 
 
 \begin{slide}
