@@ -1,0 +1,127 @@
+\documentclass[landscape]{slides}
+\usepackage[landscape, margin=2cm]{geometry}
+\usepackage{color}
+\usepackage{bm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\definecolor{mygreen}{rgb}{0,0.6,0}
+\definecolor{mymauve}{rgb}{0.58,0,0.82}
+\lstset{ %
+  backgroundcolor=\color{white},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}
+  basicstyle=\footnotesize,        % the size of the fonts that are used for the code
+  commentstyle=\color{mygreen},    % comment style
+  deletekeywords={...},            % if you want to delete keywords from the given language
+  extendedchars=true,              % lets you use non-ASCII characters; for 8-bits encodings only, does not work with UTF-8
+  frame=single,                    % adds a frame around the code
+  keywordstyle=\color{blue},       % keyword style
+  language=Python,                 % the language of the code
+  rulecolor=\color{black},         % if not set, the frame-color may be changed on line-breaks within not-black text (e.g. comments (green here))
+  showspaces=false,                % show spaces everywhere adding particular underscores; it overrides 'showstringspaces'
+  stringstyle=\color{mymauve},     % string literal style
+  title=\lstname                   % show the filename of files included with \lstinputlisting; also try caption instead of title
+}
+\hypersetup{
+    colorlinks=true,
+    urlcolor=blue
+}
+
+\graphicspath{ {./img/} {./charts/} }
+
+
+\title{Django at Scale}
+\author{Adam Johnson - me@adamj.eu}
+\date{12th August 2014}
+
+\begin{document}
+
+\maketitle
+
+
+\begin{slide}
+
+    \textcolor{blue}{\Large{History}}
+
+    \begin{itemize}
+        \item Worked at Memrise.com as lead developer - 1.3 million users, ~20k uniques/day
+        \item Now at YPlan - over 1 million downloads, N uniques/day
+        \item Both powered by Django with API and Web parts
+    \end{itemize}
+
+\end{slide}
+
+
+
+
+
+\begin{slide}
+
+    \textcolor{blue}{\Large{Scaling Django}}
+
+    \begin{itemize}
+        \item What 'comes apart' first?
+        \item What should you do with your code, caching, and database?
+    \end{itemize}
+
+\end{slide}
+
+
+
+
+\begin{slide}
+
+    \textcolor{blue}{\Large{Code: base classes}}
+
+    \begin{itemize}
+        \item Wrap around django where sensible, to  implement scaling changes at the highest level
+        \item Views, admin, models, querysets, ...
+    \end{itemize}
+
+    \begin{lstlisting}[language=Python]
+# project/admin.py
+class ModelAdmin(admin.ModelAdmin):
+    pass
+
+# blog/admin.py
+from project.admin import ModelAdmin
+
+class BlogPostAdmin(ModelAdmin):
+    # bla bla bla...
+    \end{lstlisting}
+
+\end{slide}
+
+
+\begin{slide}
+
+    \textcolor{blue}{\Large{Code: base classes}}
+
+    \begin{itemize}
+        \item e.g. to make all Admin pages use new queryset class (see my \href{http://adamj.eu/tech/2014/07/16/extending-djangos-queryset-to-return-approximate-counts/}{blog post})
+    \end{itemize}
+
+
+    \begin{lstlisting}[language=Python]
+# project/admin.py
+class ModelAdmin(admin.ModelAdmin):
+    def queryset(self, request):
+        qs = super(MySuperDuperAdmin, self) \
+             .queryset(request)
+        qs = qs._clone(klass=ApproxCountQuerySet)
+        return qs
+    \end{lstlisting}
+
+\end{slide}
+
+
+
+\begin{slide}
+    \textcolor{blue}{\Large{Thank you}}
+
+    \begin{itemize}
+        \item \url{me@adamj.eu}
+    \end{itemize}
+
+\end{slide}
+
+\end{document}
