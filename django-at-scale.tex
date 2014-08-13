@@ -186,7 +186,7 @@ def some_func(user_id):
     \begin{lstlisting}
 def some_func():
     cache_key = 'key:' + str(user_id)
-    last_update, val cache.get(cache_key)
+    last_update, val = cache.get(cache_key)
     if last_update < now() - timedelta(minutes=15):
         # celery task to refill cache_key
         slow_func.apply_async([user_id])
